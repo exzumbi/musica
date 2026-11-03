@@ -1,70 +1,87 @@
-# Publicar este projeto musical na Cloudflare Pages
+# Publicar no Worker existente `musica` com Static Assets
 
-Este é um projeto separado. Não selecionar repositório, projeto Pages/Workers, domínio ou zona do site Incômodo Coletivo. O repositório de destino deste aplicativo é `exzumbi/musica`.
+O destino deste projeto é o **Cloudflare Worker `musica`**, conectado ao repositório **`exzumbi/musica`**. Não criar um projeto Pages para esta configuração, nem alterar qualquer repositório, Worker, domínio ou zona da Incômodo Coletivo.
 
-## GitHub → Cloudflare Pages
+## Configuração do Worker
 
-1. Abra o painel da Cloudflare e entre em **Workers & Pages**.
-2. Escolha **Create application → Pages → Import an existing Git repository**.
-3. Use a integração GitHub já existente e selecione **somente `exzumbi/musica`**. Se o repositório não aparecer, abra as configurações da instalação GitHub da Cloudflare e acrescente esse repositório à lista permitida, preservando os demais.
-4. Crie um projeto novo, com nome sugerido **`dicionario-musical`**. Se esse nome estiver ocupado, escolha outro nome novo; nunca reutilize o projeto da Incômodo.
-5. Na configuração do build:
+`wrangler.jsonc` usa **Workers Static Assets**:
+
+```json
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "musica",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
+```
+
+A data de compatibilidade foi preservada. `pages_build_output_dir` foi removido porque pertence exclusivamente a Pages e fazia o Wrangler rejeitar o comando de deploy de Workers. Este projeto não precisa de `main`/script Worker: só publica os assets gerados pelo Vite.
+
+O fallback `single-page-application` serve `index.html` para navegações sem um arquivo correspondente. Os arquivos reais de `/assets/` continuam sendo servidos normalmente. A navegação da aplicação também usa fragmentos como `/#theory` e `/#repertoire`.
+
+O arquivo `public/_headers` vai para `dist/_headers` e permite microfone na própria origem. Abrir o endereço HTTPS diretamente no navegador é necessário para evitar bloqueios de microfone de um iframe externo.
+
+## Cloudflare: usar o destino existente
+
+1. No painel, abra **Workers & Pages → musica**. Confirme que é o Worker musical; não abra o projeto da Incômodo.
+2. Em **Settings → Builds**, edite a configuração de build da integração GitHub existente. Os nomes podem aparecer traduzidos no painel.
+3. Configure:
 
 | Campo | Valor |
 | --- | --- |
-| Production branch | `main` |
-| Framework preset | `React (Vite)` se disponível; caso contrário `None`, com os campos abaixo |
+| Repositório | `exzumbi/musica` |
+| Branch de produção | `main` |
+| Diretório raiz | Raiz do repositório; deixar vazio ou usar `/`, conforme o campo. Não usar `/workspace/musica`. |
 | Build command | `npm run build` |
-| Build output directory | `dist` |
-| Root directory | Raiz do repositório (deixar em branco; não usar `/workspace/musica`) |
-| Environment variable | `NODE_VERSION` = `24.19.0` |
+| Deploy command | **`npm run deploy`**, equivalente a **`npx wrangler deploy`** |
+| Variável de build | `NODE_VERSION` = `24.19.0` |
 
-A Cloudflare instala as dependências com base em `package.json` e `package-lock.json`. A versão do Node também está fixada em `.node-version`. Nenhum segredo da aplicação é necessário.
+O diretório de assets é `./dist`, definido no Wrangler. Não usar `wrangler pages deploy` nem campos de saída de Pages para este Worker. Se o painel ainda contém um comando com `pages`, substitua-o pelo comando de Workers acima.
 
-6. Escolha **Save and Deploy**. O build deve terminar com a criação de `dist/index.html` e `dist/assets/`.
-7. Copie o endereço **HTTPS `*.pages.dev` efetivamente exibido pela Cloudflare**. Não há um domínio pré-garantido neste documento.
-8. Abra a URL em uma nova aba, confira as sete áreas e abra o afinador. Clique **Ativar microfone** e autorize somente se quiser afinar. No celular, abra o endereço HTTPS diretamente no navegador; um iframe de outro site pode bloquear a permissão.
+A integração deve instalar as dependências, inclusive as de desenvolvimento necessárias para TypeScript, Vite e Wrangler. `.node-version` também fixa o Node. O pacote Wrangler faz parte do projeto e sua versão exata está no lockfile.
 
-Não é necessário domínio personalizado, plano pago, porta 5173, servidor Vite em produção ou alteração de DNS. Depois do primeiro deploy, novos commits na branch de produção podem disparar novas publicações deste projeto musical.
+4. Salve e execute **Retry build/Deploy**, ou aguarde o build disparado pelo commit em `main`.
+5. Abra a URL **HTTPS `workers.dev`** exibida no Worker `musica`. `workers_dev: true` habilita esse endereço, mas o subdomínio da conta deve estar configurado na própria Cloudflare, se ainda não existir. Não é necessário contratar serviço pago ou alterar DNS/domínios existentes.
 
-## Arquivos e rotas
+## Validar e publicar pelo terminal
 
-- `npm run build` faz a checagem TypeScript e gera os arquivos estáticos em `dist`.
-- `wrangler.jsonc` declara o nome sugerido e o diretório de saída de **Pages**; não contém conta, token ou domínio.
-- `public/_headers` é copiado para `dist/_headers`. Ele permite microfone na própria origem, sem habilitar câmera ou geolocalização.
-- O site usa navegação por fragmentos (`/#theory`, `/#repertoire`, etc.). Cloudflare Pages também fornece fallback de SPA quando não existe um `404.html` na raiz. Por isso não é necessário criar uma regra genérica de redirecionamento que possa interferir nos assets.
-- Fontes, CSS e JavaScript são servidos a partir dos arquivos locais gerados. Não enviar `node_modules` como diretório de publicação.
-- Não usar `npm run dev` ou `vite preview` como comando de build.
+Depois de instalar as dependências:
 
-## Backup e alternativa de upload manual
+```sh
+npm ci
+npm run build
+npm run deploy:check
+```
 
-O ZIP completo contém código-fonte, lockfile, configuração, testes, documentação e a versão compilada. Exclui Git, dependências instaladas, caches e resultados de testes.
+`deploy:check` executa `wrangler deploy --dry-run`: valida a configuração de Workers sem publicar.
 
-Para colocar o código em um repositório GitHub novo pela interface:
+Para efetivamente publicar, em um ambiente autenticado na conta Cloudflare correta:
 
-1. No GitHub, clique **+ → New repository** e escolha um nome novo, como `dicionario-musical`. Não reutilize o repositório da Incômodo.
-2. Crie o repositório. Extraia o ZIP completo no computador.
-3. Escolha **Add file → Upload files** e envie os arquivos da raiz extraída, incluindo `src`, `public`, `package.json`, `package-lock.json`, `index.html`, `tsconfig.json`, `.gitignore`, `.node-version` e `wrangler.jsonc`. Não envie o ZIP como um único arquivo esperando que o GitHub o extraia. `dist` não precisa ser enviado ao GitHub: será reconstruído pela Cloudflare.
-4. Confirme o commit em `main` e siga a integração Pages acima usando esse novo repositório.
+```sh
+npm run deploy
+```
 
-Para publicar sem GitHub, crie **outro projeto novo** na área Pages usando **Upload assets/Direct Upload** e envie o ZIP de produção, cujo `index.html` está na raiz. Esse modo não configura a integração automática GitHub; para o caminho solicitado, prefira o projeto conectado ao Git. Os dois modos não devem ser usados para substituir o site da Incômodo.
+Em uma execução manual sem um passo separado de build, use `npm run build && npm run deploy`. No painel, mantenha o build e o deploy nos respectivos campos.
 
-## Verificação depois do deploy
+A aplicação não exige segredos. A publicação exige a autorização Cloudflare da integração/CLI; credenciais GitHub não substituem essa autorização. Não salvar tokens em arquivos versionados.
 
-- Página inicial carrega por HTTPS e mostra as sete áreas.
-- JavaScript/CSS/fontes em `/assets/` retornam 200 com os tipos corretos.
-- Links `/#theory` e `/#repertoire` carregam sem 404.
-- O navegador informa contexto seguro; `navigator.mediaDevices.getUserMedia` existe nos navegadores compatíveis.
-- O microfone só é solicitado após clicar, e Encerrar captação libera o acesso.
-- Os estudos continuam locais ao navegador. O domínio novo tem um armazenamento separado; use exportar/importar para transferir estudos entre origens.
+## Conferir depois do deploy
 
-Só considerar o site publicado depois de conferir o endereço real do deploy. Publicar o ambiente de desenvolvimento é diferente de publicar o aplicativo na Cloudflare.
+- O log identifica o Worker `musica` e publica os arquivos de `dist`.
+- A URL real `workers.dev` carrega por HTTPS; não inventar o subdomínio antes de vê-lo no painel.
+- As sete áreas e os arquivos JS/CSS/fontes carregam corretamente.
+- As navegações SPA sem um arquivo correspondente recebem `index.html`; assets reais mantêm seus tipos e conteúdos.
+- O afinador só solicita microfone após clique e Encerrar captação libera o dispositivo.
+- Progresso e repertório continuam locais ao navegador. Ao mudar de origem, transferir estudos com exportar/importar.
 
-## Referências oficiais conferidas
+Um dry-run aprovado ou um push ao GitHub não confirmam publicação. Só considerar o Worker publicado depois de conferir a URL real. Nenhuma publicação do ambiente de desenvolvimento é necessária para esta correção.
 
-Documentação oficial consultada no repositório `cloudflare/cloudflare-docs`, branch `production`:
+## Documentação oficial
 
-- [React no Pages](https://developers.cloudflare.com/pages/framework-guides/deploy-a-react-site/)
-- [Servir páginas e fallback SPA](https://developers.cloudflare.com/pages/configuration/serving-pages/)
-
-Nenhuma alteração em outro site, domínio ou conta é necessária para esses passos.
+- [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
+- [Configuração de Static Assets](https://developers.cloudflare.com/workers/static-assets/configuration/)
+- [Roteamento e fallback SPA](https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/)

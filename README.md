@@ -122,6 +122,8 @@ O nome provisório aparece na marca em `src/platform/Platform.tsx`, na constante
 
 A aparência respeita `prefers-reduced-motion`. Atividades têm botões e campos operáveis por teclado; nenhuma depende de arrastar ou exclusivamente de cor. Rolagem automática é opcional e pode ser pausada. A avaliação de batidas mede regularidade relativa, não sincronismo absoluto nem precisão de hardware.
 
-## Produção na Cloudflare Pages
+## Produção no Cloudflare Worker `musica`
 
-A configuração para publicar este projeto em separado está em [docs/DEPLOY-CLOUDFLARE.md](docs/DEPLOY-CLOUDFLARE.md). Build: `npm run build`; saída: `dist`; branch de produção: `main`; Node `24.19.0`. Não utilizar o projeto ou domínio do Incômodo Coletivo. A URL gratuita `*.pages.dev` será informada pela Cloudflare após o deploy; este documento não afirma que já exista uma publicação.
+O destino é o Worker existente **`musica`**, com **Workers Static Assets**. A configuração e os passos estão em [docs/DEPLOY-CLOUDFLARE.md](docs/DEPLOY-CLOUDFLARE.md). Build: `npm run build`; assets: `./dist`; validação sem publicar: `npm run deploy:check`; deploy: **`npm run deploy`** (equivale a `npx wrangler deploy`). Branch `main`; Node `24.19.0`. `wrangler.jsonc` habilita `workers_dev` e fallback de SPA, sem `pages_build_output_dir`.
+
+Não utilizar comandos Pages, nem o projeto ou domínio do Incômodo Coletivo. A URL gratuita HTTPS `workers.dev` será exibida pela Cloudflare após o deploy do Worker; este documento não afirma que uma URL tenha sido verificada.
